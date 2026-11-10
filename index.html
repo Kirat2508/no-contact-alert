@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex">
-  <title>No Contact removed</title>
+  <title>No Contact</title>
   <style>
     :root { --bg: #f4f1ec; --text: #22201c; --muted: #6f6a62; --accent: #3d6b5a; }
     @media (prefers-color-scheme: dark) { :root { --bg: #161514; --text: #ece8e1; --muted: #a39d93; --accent: #7fb39f; } }
@@ -17,36 +17,53 @@
 </head>
 <body>
   <main>
-    <h1>No Contact was removed.</h1>
-    <p id="status">Letting your friend know…</p>
-    <p>That's okay. If it was a hard moment, talking to them will help more than whatever you were about to look at.</p>
+    <h1 id="title">No Contact</h1>
+    <p id="status"></p>
+    <p id="body"></p>
   </main>
   <script>
-    // Opened by Chrome when the extension is uninstalled. The access key is in the
-    // #hash, so it never reaches this page's host. It only sends mail to the friend.
+    // Two modes, both set by the extension in the #hash (never sent to this host):
+    //  #mode=connect&e=...  one-time setup, so the friend can activate alerts from this page
+    //  #e=...               opened by Chrome when the extension is uninstalled
     (async () => {
       const p = new URLSearchParams(location.hash.slice(1));
-      const key = p.get('k');
+      const to = p.get('e');
       const name = p.get('n') || 'Your friend';
       const friend = p.get('f');
-      const status = document.getElementById('status');
-      if (!key) { status.textContent = ''; return; }
+      const connect = p.get('mode') === 'connect';
+      const $ = (id) => document.getElementById(id);
+      if (!to) return;
       history.replaceState(null, '', location.pathname);
+
+      if (connect) {
+        $('title').textContent = 'Tamper alert set up';
+        $('body').textContent = 'You can close this tab.';
+      } else {
+        $('title').textContent = 'No Contact was removed.';
+        $('status').textContent = 'Letting your friend know…';
+        $('body').textContent = "That's okay. If it was a hard moment, talking to them will help more than whatever you were about to look at.";
+      }
+
+      const hi = friend ? `Hi ${friend},` : 'Hi,';
+      const message = connect
+        ? `${hi}\n\nThis connects the tamper alert for ${name}'s No Contact blocker. If they ever uninstall it while it's locked, you'll get an email from here.`
+        : `${hi}\n\n${name} just uninstalled the No Contact blocker while it was locked.\n\nIt might be nothing, or it might be a rough moment. A message or call would be good.`;
       try {
-        const r = await fetch('https://api.web3forms.com/submit', {
+        const r = await fetch(`https://formsubmit.co/ajax/${encodeURIComponent(to)}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
           body: JSON.stringify({
-            access_key: key,
-            from_name: 'No Contact',
-            subject: `${name} removed the No Contact blocker`,
-            message: `${friend ? 'Hi ' + friend + ',' : 'Hi,'}\n\n${name} just uninstalled the No Contact blocker while it was locked.\n\nIt might be nothing, or it might be a rough moment. A message or call would be good.`,
+            _subject: connect ? `${name}'s No Contact tamper alert` : `${name} removed the No Contact blocker`,
+            _template: 'box',
+            _captcha: 'false',
+            from: 'No Contact',
+            message,
           }),
         });
         const j = await r.json().catch(() => ({}));
-        status.textContent = j.success ? `${friend || 'Your friend'} has been told.` : '';
+        if (!connect) $('status').textContent = String(j.success) === 'true' ? `${friend || 'Your friend'} has been told.` : '';
       } catch (_) {
-        status.textContent = '';
+        if (!connect) $('status').textContent = '';
       }
     })();
   </script>

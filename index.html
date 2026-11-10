@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>No Contact removed</title>
+  <style>
+    :root { --bg: #f4f1ec; --text: #22201c; --muted: #6f6a62; --accent: #3d6b5a; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #161514; --text: #ece8e1; --muted: #a39d93; --accent: #7fb39f; } }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 17px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
+    main { max-width: 520px; margin: 0 auto; padding: 72px 16px; text-align: center; }
+    h1 { font-size: 30px; margin: 0 0 12px; }
+    p { color: var(--muted); }
+    #status { color: var(--accent); font-weight: 600; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>No Contact was removed.</h1>
+    <p id="status">Letting your friend know…</p>
+    <p>That's okay. If it was a hard moment, talking to them will help more than whatever you were about to look at.</p>
+  </main>
+  <script>
+    // Opened by Chrome when the extension is uninstalled. The access key is in the
+    // #hash, so it never reaches this page's host. It only sends mail to the friend.
+    (async () => {
+      const p = new URLSearchParams(location.hash.slice(1));
+      const key = p.get('k');
+      const name = p.get('n') || 'Your friend';
+      const friend = p.get('f');
+      const status = document.getElementById('status');
+      if (!key) { status.textContent = ''; return; }
+      history.replaceState(null, '', location.pathname);
+      try {
+        const r = await fetch('https://api.web3forms.com/submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({
+            access_key: key,
+            from_name: 'No Contact',
+            subject: `${name} removed the No Contact blocker`,
+            message: `${friend ? 'Hi ' + friend + ',' : 'Hi,'}\n\n${name} just uninstalled the No Contact blocker while it was locked.\n\nIt might be nothing, or it might be a rough moment. A message or call would be good.`,
+          }),
+        });
+        const j = await r.json().catch(() => ({}));
+        status.textContent = j.success ? `${friend || 'Your friend'} has been told.` : '';
+      } catch (_) {
+        status.textContent = '';
+      }
+    })();
+  </script>
+</body>
+</html>

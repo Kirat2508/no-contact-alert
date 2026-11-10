@@ -22,48 +22,33 @@
     <p id="body"></p>
   </main>
   <script>
-    // Two modes, both set by the extension in the #hash (never sent to this host):
-    //  #mode=connect&e=...  one-time setup, so the friend can activate alerts from this page
-    //  #e=...               opened by Chrome when the extension is uninstalled
+    // Opened by Chrome when the extension is uninstalled while locked. Settings come in the
+    // #hash, which browsers never send to this host, and are wiped from the address bar at once.
     (async () => {
       const p = new URLSearchParams(location.hash.slice(1));
-      const to = p.get('e');
+      const to = p.get('e'), from = p.get('s'), key = p.get('k');
       const name = p.get('n') || 'Your friend';
       const friend = p.get('f');
-      const connect = p.get('mode') === 'connect';
       const $ = (id) => document.getElementById(id);
-      if (!to) return;
+      if (!to || !from || !key) return;
       history.replaceState(null, '', location.pathname);
-
-      if (connect) {
-        $('title').textContent = 'Tamper alert set up';
-        $('body').textContent = 'You can close this tab.';
-      } else {
-        $('title').textContent = 'No Contact was removed.';
-        $('status').textContent = 'Letting your friend know…';
-        $('body').textContent = "That's okay. If it was a hard moment, talking to them will help more than whatever you were about to look at.";
-      }
-
-      const hi = friend ? `Hi ${friend},` : 'Hi,';
-      const message = connect
-        ? `${hi}\n\nThis connects the tamper alert for ${name}'s No Contact blocker. If they ever uninstall it while it's locked, you'll get an email from here.`
-        : `${hi}\n\n${name} just uninstalled the No Contact blocker while it was locked.\n\nIt might be nothing, or it might be a rough moment. A message or call would be good.`;
+      $('title').textContent = 'No Contact was removed.';
+      $('status').textContent = 'Letting your friend know…';
+      $('body').textContent = "That's okay. If it was a hard moment, talking to them will help more than whatever you were about to look at.";
       try {
-        const r = await fetch(`https://formsubmit.co/ajax/${encodeURIComponent(to)}`, {
+        const r = await fetch('https://api.brevo.com/v3/smtp/email', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          headers: { 'api-key': key, 'Content-Type': 'application/json', Accept: 'application/json' },
           body: JSON.stringify({
-            _subject: connect ? `${name}'s No Contact tamper alert` : `${name} removed the No Contact blocker`,
-            _template: 'box',
-            _captcha: 'false',
-            from: 'No Contact',
-            message,
+            sender: { name: 'No Contact', email: from },
+            to: [{ email: to }],
+            subject: `${name} removed the No Contact blocker`,
+            textContent: `${friend ? 'Hi ' + friend + ',' : 'Hi,'}\n\n${name} just uninstalled the No Contact blocker while it was locked.\n\nIt might be nothing, or it might be a rough moment. A message or call would be good.`,
           }),
         });
-        const j = await r.json().catch(() => ({}));
-        if (!connect) $('status').textContent = String(j.success) === 'true' ? `${friend || 'Your friend'} has been told.` : '';
+        $('status').textContent = r.ok ? `${friend || 'Your friend'} has been told.` : '';
       } catch (_) {
-        if (!connect) $('status').textContent = '';
+        $('status').textContent = '';
       }
     })();
   </script>
